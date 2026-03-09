@@ -50,9 +50,9 @@ def claim():
 @app.route('/transfer', methods=['POST'])
 def transfer():
     data = request.json
-    if not data:
-        return jsonify({"error": "أرسل البيانات"})
-    return jsonify(coin.transfer(data['from'], data['private_key'], data['to'], data['amount']))
+    if not data or 'from' not in data or 'private_key' not in data or 'to_address' not in data or 'amount' not in data:
+        return jsonify({"error": "أرسل البيانات كاملة"})
+    return jsonify(coin.transfer_by_address(data['from'], data['private_key'], data['to_address'], data['amount']))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
