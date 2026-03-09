@@ -42,9 +42,9 @@ class IQSDCoin:
         init_db()
         self.founder_key = "hussain_founder_key_iqsd_2024"
         self.founder_address = "IQSD" + hashlib.sha256(self.founder_key.encode()).hexdigest()[:16].upper()
-        self.total_supply = 21000000
-        self.block_reward = 50
-        self.halving_interval = 210000
+        self.total_supply = 210278282828200
+        self.block_reward = 500
+        self.halving_interval = 21000000
         self.staking_rate = 0.05
         self._init_founder()
 
