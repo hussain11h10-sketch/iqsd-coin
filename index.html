@@ -90,7 +90,7 @@ button.sec:hover { background:#00ff88; color:#050a05; }
 <div class="section" id="wallet">
   <div class="card">
     <h3>👛 إنشاء محفظة جديدة</h3>
-    <div class="warn">⚠️ احتفظ بمفتاحك الخاص! لو ضيعته ضيعت عملاتك!</div>
+    <div class="warn">⚠️ احتفظ بمفتاحك الخاص وعنوانك! لو ضيعتهم ضيعت عملاتك!</div>
     <input type="text" id="newWalletName" placeholder="اسمك">
     <button onclick="createWallet()">إنشاء محفظة</button>
     <div class="result" id="createResult"></div>
@@ -107,12 +107,12 @@ button.sec:hover { background:#00ff88; color:#050a05; }
 <div class="section" id="transfer">
   <div class="card">
     <h3>💸 تحويل IQSD</h3>
+    <div class="alert">التحويل يتم عبر العنوان. رسوم 0.1% فقط!</div>
     <input type="text" id="fromName" placeholder="اسمك">
     <input type="password" id="transferKey" placeholder="مفتاحك الخاص 🔐">
-    <input type="text" id="toName" placeholder="اسم المستلم">
+    <input type="text" id="toAddress" placeholder="عنوان المستلم (IQSD...)">
     <input type="number" id="amount" placeholder="المبلغ">
-    <div class="alert">رسوم التحويل: 0.1% فقط</div>
-    <button onclick="doTransfer()">تحويل</button>
+    <button onclick="doTransfer()">تحويل ✈️</button>
     <div class="result" id="transferResult"></div>
   </div>
 </div>
@@ -125,14 +125,14 @@ button.sec:hover { background:#00ff88; color:#050a05; }
     <input type="text" id="stakeName" placeholder="اسم المحفظة">
     <input type="password" id="stakeKey" placeholder="مفتاحك الخاص 🔐">
     <input type="number" id="stakeAmount" placeholder="المبلغ">
-    <button onclick="doStake()">إيداع</button>
+    <button onclick="doStake()">إيداع 📈</button>
     <div class="result" id="stakeResult"></div>
   </div>
   <div class="card">
     <h3>💰 استلام الفوائد</h3>
     <input type="text" id="claimName" placeholder="اسم المحفظة">
     <input type="password" id="claimKey" placeholder="مفتاحك الخاص 🔐">
-    <button class="sec" onclick="doClaim()">استلام الفوائد</button>
+    <button class="sec" onclick="doClaim()">استلام الفوائد 💰</button>
     <div class="result" id="claimResult"></div>
   </div>
 </div>
@@ -163,7 +163,7 @@ function showResult(id, data) {
 
 function showTab(tab, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab, .nav-links a').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
   if(el) el.classList.add('active');
 }
@@ -201,10 +201,10 @@ async function checkBalance() {
 async function doTransfer() {
   const from = document.getElementById('fromName').value.trim();
   const key = document.getElementById('transferKey').value.trim();
-  const to = document.getElementById('toName').value.trim();
+  const toAddress = document.getElementById('toAddress').value.trim();
   const amount = parseFloat(document.getElementById('amount').value);
-  if (!from || !key || !to || !amount) return alert('أكمل البيانات');
-  const d = await api('/transfer', 'POST', {from, private_key: key, to, amount});
+  if (!from || !key || !toAddress || !amount) return alert('أكمل البيانات');
+  const d = await api('/transfer', 'POST', {from, private_key: key, to_address: toAddress, amount});
   showResult('transferResult', d);
   loadStats();
 }
@@ -230,4 +230,4 @@ loadStats();
 setInterval(loadStats, 15000);
 </script>
 </body>
-</html>
+      </html>
