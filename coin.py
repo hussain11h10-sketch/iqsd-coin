@@ -20,6 +20,9 @@ class Wallet:
     def generate_private_key(self):
         return hashlib.sha256(str(random.randint(1000000, 9999999)).encode()).hexdigest()
 
+    def verify_key(self, private_key):
+        return self.private_key == private_key
+
     def get_info(self):
         return {
             "owner": self.owner,
@@ -38,7 +41,6 @@ class IQSDCoin:
         self.halving_interval = 210000
         self.staking_rate = 0.05
         self.blocks = []
-        self.pending_tx = []
 
     def init_founder(self, name):
         if self.founder_wallet:
@@ -49,7 +51,7 @@ class IQSDCoin:
         self.founder_wallet = name
         return {
             "success": True,
-            "message": f"👑 تم إنشاء محفظة المؤسس {name}",
+            "message": f"👑 محفظة المؤسس {name}",
             "address": w.address,
             "private_key": w.private_key,
             "balance": 1000000
@@ -65,22 +67,24 @@ class IQSDCoin:
             "owner": name,
             "address": w.address,
             "private_key": w.private_key,
-            "message": f"تم إنشاء محفظة {name} بنجاح!"
+            "message": "احتفظ بمفتاحك الخاص! لا تعطيه لأحد!"
         }
 
-    def mine(self, miner_name):
-        if miner_name not in self.wallets:
+    def mine(self, name, private_key):
+        if name not in self.wallets:
             return {"error": "المحفظة غير موجودة"}
+        if not self.wallets[name].verify_key(private_key):
+            return {"error": "🔐 مفتاح خاطئ!"}
         if self.mined_supply >= self.total_supply:
             return {"error": "تم تعدين كل العملات!"}
         halvings = int(self.mined_supply // self.halving_interval)
         reward = self.block_reward / (2 ** halvings)
         if random.randint(1, 10) > 3:
-            self.wallets[miner_name].balance += reward
+            self.wallets[name].balance += reward
             self.mined_supply += reward
             block = {
                 "index": len(self.blocks),
-                "miner": miner_name,
+                "miner": name,
                 "reward": reward,
                 "timestamp": time.time(),
                 "hash": hashlib.sha256(str(time.time()).encode()).hexdigest()[:16]
@@ -90,13 +94,15 @@ class IQSDCoin:
                 "success": True,
                 "message": f"🎉 عدنت {reward} IQSD!",
                 "reward": reward,
-                "new_balance": self.wallets[miner_name].balance
+                "new_balance": self.wallets[name].balance
             }
         return {"success": False, "message": "لم تنجح، حاول مرة أخرى!"}
 
-    def stake(self, name, amount):
+    def stake(self, name, private_key, amount):
         if name not in self.wallets:
             return {"error": "المحفظة غير موجودة"}
+        if not self.wallets[name].verify_key(private_key):
+            return {"error": "🔐 مفتاح خاطئ!"}
         w = self.wallets[name]
         if w.balance < amount:
             return {"error": "رصيد غير كافٍ"}
@@ -106,13 +112,15 @@ class IQSDCoin:
         daily = round(amount * self.staking_rate / 365, 4)
         return {
             "success": True,
-            "message": f"تم إيداع {amount} IQSD للستيكينغ",
+            "message": f"تم إيداع {amount} IQSD",
             "daily_reward": f"{daily} IQSD يومياً"
         }
 
-    def claim_staking(self, name):
+    def claim_staking(self, name, private_key):
         if name not in self.wallets:
             return {"error": "المحفظة غير موجودة"}
+        if not self.wallets[name].verify_key(private_key):
+            return {"error": "🔐 مفتاح خاطئ!"}
         w = self.wallets[name]
         if not w.staking or not w.staking_since:
             return {"error": "لا يوجد ستيكينغ"}
@@ -126,9 +134,11 @@ class IQSDCoin:
             "new_balance": w.balance
         }
 
-    def transfer(self, sender, receiver, amount):
+    def transfer(self, sender, private_key, receiver, amount):
         if sender not in self.wallets:
             return {"error": "محفظة المرسل غير موجودة"}
+        if not self.wallets[sender].verify_key(private_key):
+            return {"error": "🔐 مفتاح خاطئ!"}
         if receiver not in self.wallets:
             return {"error": "محفظة المستلم غير موجودة"}
         fee = round(amount * 0.001, 4)
@@ -143,8 +153,7 @@ class IQSDCoin:
             "success": True,
             "message": f"تم تحويل {amount} IQSD",
             "fee": fee,
-            "sender_balance": self.wallets[sender].balance,
-            "receiver_balance": self.wallets[receiver].balance
+            "sender_balance": self.wallets[sender].balance
         }
 
     def get_stats(self):
@@ -156,4 +165,4 @@ class IQSDCoin:
             "total_blocks": len(self.blocks),
             "staking_rate": "5% سنوياً",
             "block_reward": self.block_reward
-      }
+        }
