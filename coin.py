@@ -67,8 +67,14 @@ class IQSDCoin:
             "owner": name,
             "address": w.address,
             "private_key": w.private_key,
-            "message": "احتفظ بمفتاحك الخاص! لا تعطيه لأحد!"
+            "message": "⚠️ احتفظ بمفتاحك الخاص! لا تعطيه لأحد!"
         }
+
+    def get_wallet_by_address(self, address):
+        for w in self.wallets.values():
+            if w.address == address:
+                return w
+        return None
 
     def mine(self, name, private_key):
         if name not in self.wallets:
@@ -134,26 +140,28 @@ class IQSDCoin:
             "new_balance": w.balance
         }
 
-    def transfer(self, sender, private_key, receiver, amount):
-        if sender not in self.wallets:
+    def transfer_by_address(self, sender_name, private_key, to_address, amount):
+        if sender_name not in self.wallets:
             return {"error": "محفظة المرسل غير موجودة"}
-        if not self.wallets[sender].verify_key(private_key):
+        if not self.wallets[sender_name].verify_key(private_key):
             return {"error": "🔐 مفتاح خاطئ!"}
-        if receiver not in self.wallets:
-            return {"error": "محفظة المستلم غير موجودة"}
+        receiver = self.get_wallet_by_address(to_address)
+        if not receiver:
+            return {"error": "عنوان المستلم غير موجود"}
         fee = round(amount * 0.001, 4)
         total = amount + fee
-        if self.wallets[sender].balance < total:
+        if self.wallets[sender_name].balance < total:
             return {"error": "رصيد غير كافٍ"}
-        self.wallets[sender].balance -= total
-        self.wallets[receiver].balance += amount
+        self.wallets[sender_name].balance -= total
+        receiver.balance += amount
         if self.founder_wallet:
             self.wallets[self.founder_wallet].balance += fee
         return {
             "success": True,
-            "message": f"تم تحويل {amount} IQSD",
+            "message": f"✅ تم تحويل {amount} IQSD",
+            "to_address": to_address,
             "fee": fee,
-            "sender_balance": self.wallets[sender].balance
+            "sender_balance": self.wallets[sender_name].balance
         }
 
     def get_stats(self):
