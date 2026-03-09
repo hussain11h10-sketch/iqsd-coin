@@ -1,29 +1,27 @@
 import hashlib
 import random
 import time
+import secrets
 
 class Wallet:
-    def __init__(self, owner_name):
-        self.owner = owner_name
-        self.address = self.generate_address()
+    def __init__(self):
         self.private_key = self.generate_private_key()
+        self.address = self.generate_address()
         self.balance = 0
         self.staking = 0
         self.staking_since = None
 
-    def generate_address(self):
-        data = str(random.randint(100000, 999999)) + self.owner
-        return "IQSD" + hashlib.sha256(data.encode()).hexdigest()[:16].upper()
-
     def generate_private_key(self):
-        return hashlib.sha256(str(random.randint(1000000, 9999999)).encode()).hexdigest()
+        return secrets.token_hex(32)
+
+    def generate_address(self):
+        return "IQSD" + hashlib.sha256(self.private_key.encode()).hexdigest()[:16].upper()
 
     def verify_key(self, private_key):
         return self.private_key == private_key
 
     def get_info(self):
         return {
-            "owner": self.owner,
             "address": self.address,
             "balance": self.balance,
             "staking": self.staking
@@ -34,68 +32,103 @@ class IQSDCoin:
         self.wallets = {}
         self.total_supply = 21000000
         self.mined_supply = 1000000
-        self.founder_name = "hussain"
         self.block_reward = 50
         self.halving_interval = 210000
         self.staking_rate = 0.05
         self.blocks = []
+        self.difficulty = 4
+        self.last_block_hash = "0000000000000000"
+        self.founder_address = None
+        self._init_founder()
 
-    def create_wallet(self, name):
-        if name in self.wallets:
-            return {"error": "المحفظة موجودة مسبقاً"}
-        w = Wallet(name)
-        if name == self.founder_name:
-            w.balance = 1000000
-        self.wallets[name] = w
+    def _init_founder(self):
+        w = Wallet()
+        w.private_key = "hussain_founder_key_iqsd_2024"
+        w.address = "IQSD" + hashlib.sha256(w.private_key.encode()).hexdigest()[:16].upper()
+        w.balance = 1000000
+        self.wallets[w.address] = w
+        self.founder_address = w.address
+
+    def create_wallet(self):
+        w = Wallet()
+        self.wallets[w.address] = w
         return {
             "success": True,
-            "owner": name,
             "address": w.address,
             "private_key": w.private_key,
-            "balance": w.balance,
-            "message": "⚠️ احتفظ بمفتاحك الخاص! لا تعطيه لأحد!"
+            "balance": 0,
+            "message": "⚠️ احتفظ بمفتاحك الخاص! لو ضيعته ضيعت عملاتك للأبد!"
         }
 
-    def get_wallet_by_address(self, address):
+    def login(self, private_key):
         for w in self.wallets.values():
-            if w.address == address:
+            if w.verify_key(private_key):
+                return {
+                    "success": True,
+                    "address": w.address,
+                    "balance": w.balance,
+                    "staking": w.staking
+                }
+        return {"error": "🔐 مفتاح خاطئ!"}
+
+    def get_wallet_by_key(self, private_key):
+        for w in self.wallets.values():
+            if w.verify_key(private_key):
                 return w
         return None
 
-    def mine(self, name, private_key):
-        if name not in self.wallets:
-            return {"error": "المحفظة غير موجودة"}
-        if not self.wallets[name].verify_key(private_key):
+    def get_wallet_by_address(self, address):
+        return self.wallets.get(address, None)
+
+    def get_mining_challenge(self):
+        halvings = int(self.mined_supply // self.halving_interval)
+        reward = self.block_reward / (2 ** halvings)
+        return {
+            "challenge": self.last_block_hash,
+            "difficulty": self.difficulty,
+            "reward": reward,
+            "target": "0" * self.difficulty
+        }
+
+    def submit_mining(self, private_key, nonce):
+        w = self.get_wallet_by_key(private_key)
+        if not w:
             return {"error": "🔐 مفتاح خاطئ!"}
         if self.mined_supply >= self.total_supply:
             return {"error": "تم تعدين كل العملات!"}
+        attempt = f"{self.last_block_hash}{nonce}"
+        result = hashlib.sha256(attempt.encode()).hexdigest()
+        target = "0" * self.difficulty
+        if not result.startswith(target):
+            return {"error": "الحل خاطئ! حاول مرة أخرى"}
         halvings = int(self.mined_supply // self.halving_interval)
         reward = self.block_reward / (2 ** halvings)
-        if random.randint(1, 10) > 3:
-            self.wallets[name].balance += reward
-            self.mined_supply += reward
-            block = {
-                "index": len(self.blocks),
-                "miner": name,
-                "reward": reward,
-                "timestamp": time.time(),
-                "hash": hashlib.sha256(str(time.time()).encode()).hexdigest()[:16]
-            }
-            self.blocks.append(block)
-            return {
-                "success": True,
-                "message": f"🎉 عدنت {reward} IQSD!",
-                "reward": reward,
-                "new_balance": self.wallets[name].balance
-            }
-        return {"success": False, "message": "لم تنجح، حاول مرة أخرى!"}
+        w.balance += reward
+        self.mined_supply += reward
+        self.last_block_hash = result[:16]
+        block = {
+            "index": len(self.blocks),
+            "miner": w.address,
+            "nonce": nonce,
+            "hash": result[:16],
+            "reward": reward,
+            "timestamp": time.time()
+        }
+        self.blocks.append(block)
+        if len(self.blocks) % 10 == 0:
+            self.difficulty += 1
+        return {
+            "success": True,
+            "message": f"🎉 عدنت {reward} IQSD!",
+            "reward": reward,
+            "new_balance": w.balance,
+            "block": len(self.blocks)
+        }
 
-    def stake(self, name, private_key, amount):
-        if name not in self.wallets:
-            return {"error": "المحفظة غير موجودة"}
-        if not self.wallets[name].verify_key(private_key):
+    def stake(self, private_key, amount):
+        w = self.get_wallet_by_key(private_key)
+        if not w:
             return {"error": "🔐 مفتاح خاطئ!"}
-        w = self.wallets[name]
         if w.balance < amount:
             return {"error": "رصيد غير كافٍ"}
         w.balance -= amount
@@ -108,12 +141,10 @@ class IQSDCoin:
             "daily_reward": f"{daily} IQSD يومياً"
         }
 
-    def claim_staking(self, name, private_key):
-        if name not in self.wallets:
-            return {"error": "المحفظة غير موجودة"}
-        if not self.wallets[name].verify_key(private_key):
+    def claim_staking(self, private_key):
+        w = self.get_wallet_by_key(private_key)
+        if not w:
             return {"error": "🔐 مفتاح خاطئ!"}
-        w = self.wallets[name]
         if not w.staking or not w.staking_since:
             return {"error": "لا يوجد ستيكينغ"}
         days = (time.time() - w.staking_since) / 86400
@@ -126,28 +157,29 @@ class IQSDCoin:
             "new_balance": w.balance
         }
 
-    def transfer_by_address(self, sender_name, private_key, to_address, amount):
-        if sender_name not in self.wallets:
-            return {"error": "محفظة المرسل غير موجودة"}
-        if not self.wallets[sender_name].verify_key(private_key):
+    def transfer(self, private_key, to_address, amount):
+        sender = self.get_wallet_by_key(private_key)
+        if not sender:
             return {"error": "🔐 مفتاح خاطئ!"}
         receiver = self.get_wallet_by_address(to_address)
         if not receiver:
             return {"error": "عنوان المستلم غير موجود"}
+        if sender.address == to_address:
+            return {"error": "لا تقدر تحول لنفسك!"}
         fee = round(amount * 0.001, 4)
         total = amount + fee
-        if self.wallets[sender_name].balance < total:
+        if sender.balance < total:
             return {"error": "رصيد غير كافٍ"}
-        self.wallets[sender_name].balance -= total
+        sender.balance -= total
         receiver.balance += amount
-        if self.founder_name in self.wallets:
-            self.wallets[self.founder_name].balance += fee
+        if self.founder_address:
+            self.wallets[self.founder_address].balance += fee
         return {
             "success": True,
             "message": f"✅ تم تحويل {amount} IQSD",
-            "to_address": to_address,
+            "to": to_address,
             "fee": fee,
-            "sender_balance": self.wallets[sender_name].balance
+            "new_balance": sender.balance
         }
 
     def get_stats(self):
@@ -157,6 +189,7 @@ class IQSDCoin:
             "remaining": self.total_supply - self.mined_supply,
             "total_wallets": len(self.wallets),
             "total_blocks": len(self.blocks),
+            "difficulty": self.difficulty,
             "staking_rate": "5% سنوياً",
             "block_reward": self.block_reward
-            }
+        }
