@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IQSD Coin - العملة العربية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Cairo',sans-serif; background:#050a05; color:#e8f5ee; min-height:100vh; }
+body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(0,255,100,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,100,0.03) 1px,transparent 1px); background-size:40px 40px; pointer-events:none; }
+nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; background:rgba(5,10,5,0.9); border-bottom:1px solid #1a3d26; backdrop-filter:blur(10px); }
+.logo { font-family:'Space Mono',monospace; font-size:20px; font-weight:700; color:#00ff88; text-shadow:0 0 20px rgba(0,255,136,0.5); }
+.nav-links { display:flex; gap:20px; }
+.nav-links a { color:#5a8a6a; text-decoration:none; font-size:14px; font-weight:600; cursor:pointer; }
+.nav-links a:hover { color:#00ff88; }
+.hero { padding:120px 20px 60px; text-align:center; }
+h1 { font-size:clamp(36px,7vw,72px); font-weight:900; margin-bottom:15px; }
+h1 span { color:#00ff88; text-shadow:0 0 30px rgba(0,255,136,0.4); }
+.hero-sub { color:#5a8a6a; font-size:16px; margin-bottom:40px; }
+.stats-bar { display:flex; justify-content:center; gap:30px; flex-wrap:wrap; margin-bottom:50px; }
+.stat { background:#0d1f16; border:1px solid #1a3d26; border-radius:12px; padding:15px 25px; text-align:center; }
+.stat-num { font-family:'Space Mono',monospace; font-size:20px; color:#00ff88; font-weight:700; }
+.stat-label { font-size:12px; color:#5a8a6a; margin-top:4px; }
+.tabs { display:flex; justify-content:center; gap:10px; margin-bottom:30px; flex-wrap:wrap; padding:0 20px; }
+.tab { background:#0d1f16; border:1px solid #1a3d26; border-radius:10px; padding:10px 20px; cursor:pointer; font-family:'Cairo',sans-serif; font-size:14px; font-weight:700; color:#5a8a6a; transition:all 0.2s; }
+.tab.active, .tab:hover { background:#00ff88; color:#050a05; border-color:#00ff88; }
+.section { display:none; padding:0 20px 60px; max-width:500px; margin:0 auto; }
+.section.active { display:block; }
+.card { background:#0d1f16; border:1px solid #1a3d26; border-radius:16px; padding:24px; margin-bottom:20px; }
+.card h3 { font-size:16px; font-weight:700; margin-bottom:16px; color:#00ff88; }
+input { width:100%; background:#050a05; border:1px solid #1a3d26; border-radius:10px; padding:12px 16px; color:#e8f5ee; font-family:'Cairo',sans-serif; font-size:15px; outline:none; margin-bottom:12px; direction:ltr; }
+input:focus { border-color:#00ff88; box-shadow:0 0 0 3px rgba(0,255,136,0.1); }
+input::placeholder { color:#3a5a4a; }
+button { width:100%; background:#00ff88; color:#050a05; border:none; border-radius:10px; padding:14px; font-family:'Cairo',sans-serif; font-size:16px; font-weight:900; cursor:pointer; transition:all 0.2s; margin-bottom:8px; }
+button:hover { background:#00cc6a; box-shadow:0 0 20px rgba(0,255,136,0.3); }
+button.sec { background:transparent; border:1px solid #00ff88; color:#00ff88; }
+button.sec:hover { background:#00ff88; color:#050a05; }
+.result { background:rgba(0,255,136,0.05); border:1px solid rgba(0,255,136,0.2); border-radius:10px; padding:16px; margin-top:12px; font-size:13px; line-height:1.8; display:none; }
+.result.show { display:block; }
+.result .key { color:#5a8a6a; }
+.result .val { color:#00ff88; font-family:'Space Mono',monospace; word-break:break-all; }
+.alert { background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.2); border-radius:10px; padding:12px 16px; font-size:13px; color:#00ff88; margin-bottom:16px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">IQSD</div>
+  <div class="nav-links">
+    <a onclick="showTab('mine')">تعدين</a>
+    <a onclick="showTab('wallet')">محفظة</a>
+    <a onclick="showTab('transfer')">تحويل</a>
+    <a onclick="showTab('stake')">ستيكينغ</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>عملة <span>IQSD</span><br>العربية 🪙</h1>
+  <p class="hero-sub">عدّن، احتفظ، وحوّل بحرية تامة</p>
+  <div class="stats-bar" id="statsBar">
+    <div class="stat"><div class="stat-num" id="s1">21M</div><div class="stat-label">إجمالي العملات</div></div>
+    <div class="stat"><div class="stat-num" id="s2">-</div><div class="stat-label">تم تعدينه</div></div>
+    <div class="stat"><div class="stat-num" id="s3">-</div><div class="stat-label">عدد المحافظ</div></div>
+    <div class="stat"><div class="stat-num">5%</div><div class="stat-label">فائدة الستيكينغ</div></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('mine')">⛏️ تعدين</div>
+  <div class="tab" onclick="showTab('wallet')">👛 محفظة</div>
+  <div class="tab" onclick="showTab('transfer')">💸 تحويل</div>
+  <div class="tab" onclick="showTab('stake')">📈 ستيكينغ</div>
+</div>
+
+<!-- تعدين -->
+<div class="section active" id="mine">
+  <div class="card">
+    <h3>⛏️ عدّن IQSD</h3>
+    <div class="alert">كل محاولة تعطيك فرصة 70% للحصول على 50 IQSD!</div>
+    <input type="text" id="mineName" placeholder="اسم محفظتك">
+    <button onclick="doMine()">ابدأ التعدين ⚡</button>
+    <div class="result" id="mineResult"></div>
+  </div>
+</div>
+
+<!-- محفظة -->
+<div class="section" id="wallet">
+  <div class="card">
+    <h3>👛 إنشاء محفظة جديدة</h3>
+    <input type="text" id="newWalletName" placeholder="اسمك">
+    <button onclick="createWallet()">إنشاء محفظة</button>
+    <div class="result" id="createResult"></div>
+  </div>
+  <div class="card">
+    <h3>🔍 تحقق من الرصيد</h3>
+    <input type="text" id="checkName" placeholder="اسم المحفظة">
+    <button class="sec" onclick="checkBalance()">تحقق</button>
+    <div class="result" id="balanceResult"></div>
+  </div>
+</div>
+
+<!-- تحويل -->
+<div class="section" id="transfer">
+  <div class="card">
+    <h3>💸 تحويل IQSD</h3>
+    <input type="text" id="fromName" placeholder="من (اسمك)">
+    <input type="text" id="toName" placeholder="إلى (اسم المستلم)">
+    <input type="number" id="amount" placeholder="المبلغ">
+    <button onclick="doTransfer()">تحويل</button>
+    <div class="result" id="transferResult"></div>
+  </div>
+</div>
+
+<!-- ستيكينغ -->
+<div class="section" id="stake">
+  <div class="card">
+    <h3>📈 إيداع للستيكينغ</h3>
+    <div class="alert">احصل على 5% فائدة سنوية على عملاتك!</div>
+    <input type="text" id="stakeName" placeholder="اسم المحفظة">
+    <input type="number" id="stakeAmount" placeholder="المبلغ">
+    <button onclick="doStake()">إيداع</button>
+    <div class="result" id="stakeResult"></div>
+  </div>
+  <div class="card">
+    <h3>💰 استلام الفوائد</h3>
+    <input type="text" id="claimName" placeholder="اسم المحفظة">
+    <button class="sec" onclick="doClaim()">استلام الفوائد</button>
+    <div class="result" id="claimResult"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://iqsd-coin-production.up.railway.app';
+
+async function api(endpoint, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + endpoint, opts);
+  return r.json();
+}
+
+function showResult(id, data) {
+  const el = document.getElementById(id);
+  el.className = 'result show';
+  let html = '';
+  for (const [k,v] of Object.entries(data)) {
+    html += `<div><span class="key">${k}: </span><span class="val">${v}</span></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+async function loadStats() {
+  const d = await api('/stats');
+  document.getElementById('s2').textContent = d.mined_supply?.toLocaleString() || '-';
+  document.getElementById('s3').textContent = d.total_wallets || '-';
+}
+
+async function doMine() {
+  const name = document.getElementById('mineName').value.trim();
+  if (!name) return alert('أدخل اسم المحفظة');
+  const d = await api('/mine', 'POST', {name});
+  showResult('mineResult', d);
+}
+
+async function createWallet() {
+  const name = document.getElementById('newWalletName').value.trim();
+  if (!name) return alert('أدخل الاسم');
+  const d = await api('/wallet/create', 'POST', {name});
+  showResult('createResult', d);
+}
+
+async function checkBalance() {
+  const name = document.getElementById('checkName').value.trim();
+  if (!name) return alert('أدخل الاسم');
+  const d = await api('/wallet/' + name);
+  showResult('balanceResult', d);
+}
+
+async function doTransfer() {
+  const from = document.getElementById('fromName').value.trim();
+  const to = document.getElementById('toName').value.trim();
+  const amount = parseFloat(document.getElementById('amount').value);
+  if (!from || !to || !amount) return alert('أكمل البيانات');
+  const d = await api('/transfer', 'POST', {from, to, amount});
+  showResult('transferResult', d);
+}
+
+async function doStake() {
+  const name = document.getElementById('stakeName').value.trim();
+  const amount = parseFloat(document.getElementById('stakeAmount').value);
+  if (!name || !amount) return alert('أكمل البيانات');
+  const d = await api('/stake', 'POST', {name, amount});
+  showResult('stakeResult', d);
+}
+
+async function doClaim() {
+  const name = document.getElementById('claimName').value.trim();
+  if (!name) return alert('أدخل الاسم');
+  const d = await api('/stake/claim', 'POST', {name});
+  showResult('claimResult', d);
+}
+
+loadStats();
+setInterval(loadStats, 10000);
+</script>
+</body>
+</html>
