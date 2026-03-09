@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 from coin import IQSDCoin
-import os
 
 app = Flask(__name__)
 coin = IQSDCoin()
@@ -30,30 +29,30 @@ def get_wallet(name):
 @app.route('/mine', methods=['POST'])
 def mine():
     data = request.json
-    if not data or 'name' not in data:
-        return jsonify({"error": "أرسل الاسم"})
-    return jsonify(coin.mine(data['name']))
+    if not data or 'name' not in data or 'private_key' not in data:
+        return jsonify({"error": "أرسل الاسم والمفتاح"})
+    return jsonify(coin.mine(data['name'], data['private_key']))
 
 @app.route('/stake', methods=['POST'])
 def stake():
     data = request.json
-    if not data or 'name' not in data or 'amount' not in data:
-        return jsonify({"error": "أرسل الاسم والمبلغ"})
-    return jsonify(coin.stake(data['name'], data['amount']))
+    if not data or 'name' not in data or 'private_key' not in data or 'amount' not in data:
+        return jsonify({"error": "أرسل البيانات كاملة"})
+    return jsonify(coin.stake(data['name'], data['private_key'], data['amount']))
 
 @app.route('/stake/claim', methods=['POST'])
 def claim():
     data = request.json
-    if not data or 'name' not in data:
-        return jsonify({"error": "أرسل الاسم"})
-    return jsonify(coin.claim_staking(data['name']))
+    if not data or 'name' not in data or 'private_key' not in data:
+        return jsonify({"error": "أرسل الاسم والمفتاح"})
+    return jsonify(coin.claim_staking(data['name'], data['private_key']))
 
 @app.route('/transfer', methods=['POST'])
 def transfer():
     data = request.json
     if not data:
         return jsonify({"error": "أرسل البيانات"})
-    return jsonify(coin.transfer(data['from'], data['to'], data['amount']))
+    return jsonify(coin.transfer(data['from'], data['private_key'], data['to'], data['amount']))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
