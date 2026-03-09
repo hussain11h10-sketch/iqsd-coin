@@ -2,138 +2,196 @@ import hashlib
 import random
 import time
 import secrets
+import sqlite3
+import os
 
-class Wallet:
-    def __init__(self):
-        self.private_key = self.generate_private_key()
-        self.address = self.generate_address()
-        self.balance = 0
-        self.staking = 0
-        self.staking_since = None
+DB_PATH = '/app/iqsd.db'
 
-    def generate_private_key(self):
-        return secrets.token_hex(32)
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    def generate_address(self):
-        return "IQSD" + hashlib.sha256(self.private_key.encode()).hexdigest()[:16].upper()
-
-    def verify_key(self, private_key):
-        return self.private_key == private_key
-
-    def get_info(self):
-        return {
-            "address": self.address,
-            "balance": self.balance,
-            "staking": self.staking
-        }
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS wallets (
+        address TEXT PRIMARY KEY,
+        private_key TEXT UNIQUE,
+        balance REAL DEFAULT 0,
+        staking REAL DEFAULT 0,
+        staking_since REAL DEFAULT 0
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS blocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        miner TEXT,
+        reward REAL,
+        nonce TEXT,
+        hash TEXT,
+        timestamp REAL
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )''')
+    conn.commit()
+    conn.close()
 
 class IQSDCoin:
     def __init__(self):
-        self.wallets = {}
+        init_db()
+        self.founder_key = "hussain_founder_key_iqsd_2024"
+        self.founder_address = "IQSD" + hashlib.sha256(self.founder_key.encode()).hexdigest()[:16].upper()
         self.total_supply = 21000000
-        self.mined_supply = 1000000
         self.block_reward = 50
         self.halving_interval = 210000
         self.staking_rate = 0.05
-        self.blocks = []
-        self.difficulty = 4
-        self.last_block_hash = "0000000000000000"
-        self.founder_address = None
         self._init_founder()
 
     def _init_founder(self):
-        w = Wallet()
-        w.private_key = "hussain_founder_key_iqsd_2024"
-        w.address = "IQSD" + hashlib.sha256(w.private_key.encode()).hexdigest()[:16].upper()
-        w.balance = 1000000
-        self.wallets[w.address] = w
-        self.founder_address = w.address
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT address FROM wallets WHERE address=?", (self.founder_address,))
+        if not c.fetchone():
+            c.execute("INSERT INTO wallets (address, private_key, balance) VALUES (?,?,?)",
+                (self.founder_address, self.founder_key, 21000000))
+            conn.commit()
+        conn.close()
+
+    def _get_setting(self, key, default):
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT value FROM settings WHERE key=?", (key,))
+        row = c.fetchone()
+        conn.close()
+        return row['value'] if row else default
+
+    def _set_setting(self, key, value):
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)", (key, str(value)))
+        conn.commit()
+        conn.close()
+
+    def get_difficulty(self):
+        return int(self._get_setting('difficulty', 2))
+
+    def get_last_hash(self):
+        return self._get_setting('last_hash', '0000000000000000')
+
+    def get_mined_supply(self):
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) as cnt, SUM(reward) as total FROM blocks")
+        row = c.fetchone()
+        conn.close()
+        return (row['total'] or 0) + 1000000
+
+    def get_block_count(self):
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) as cnt FROM blocks")
+        row = c.fetchone()
+        conn.close()
+        return row['cnt']
 
     def create_wallet(self):
-        w = Wallet()
-        self.wallets[w.address] = w
+        private_key = secrets.token_hex(32)
+        address = "IQSD" + hashlib.sha256(private_key.encode()).hexdigest()[:16].upper()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("INSERT INTO wallets (address, private_key, balance) VALUES (?,?,?)",
+            (address, private_key, 0))
+        conn.commit()
+        conn.close()
         return {
             "success": True,
-            "address": w.address,
-            "private_key": w.private_key,
+            "address": address,
+            "private_key": private_key,
             "balance": 0,
             "message": "⚠️ احتفظ بمفتاحك الخاص! لو ضيعته ضيعت عملاتك للأبد!"
         }
 
     def login(self, private_key):
-        for w in self.wallets.values():
-            if w.verify_key(private_key):
-                return {
-                    "success": True,
-                    "address": w.address,
-                    "balance": w.balance,
-                    "staking": w.staking
-                }
-        return {"error": "🔐 مفتاح خاطئ!"}
-
-    def get_wallet_by_key(self, private_key):
-        for w in self.wallets.values():
-            if w.verify_key(private_key):
-                return w
-        return None
-
-    def get_wallet_by_address(self, address):
-        return self.wallets.get(address, None)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM wallets WHERE private_key=?", (private_key,))
+        w = c.fetchone()
+        conn.close()
+        if not w:
+            return {"error": "🔐 مفتاح خاطئ!"}
+        return {
+            "success": True,
+            "address": w['address'],
+            "balance": w['balance'],
+            "staking": w['staking']
+        }
 
     def get_mining_challenge(self):
-        halvings = int(self.mined_supply // self.halving_interval)
+        difficulty = self.get_difficulty()
+        mined = self.get_mined_supply()
+        halvings = int(mined // self.halving_interval)
         reward = self.block_reward / (2 ** halvings)
         return {
-            "challenge": self.last_block_hash,
-            "difficulty": self.difficulty,
+            "challenge": self.get_last_hash(),
+            "difficulty": difficulty,
             "reward": reward,
-            "target": "0" * self.difficulty
+            "target": "0" * difficulty
         }
 
     def submit_mining(self, private_key, nonce):
-        w = self.get_wallet_by_key(private_key)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM wallets WHERE private_key=?", (private_key,))
+        w = c.fetchone()
         if not w:
+            conn.close()
             return {"error": "🔐 مفتاح خاطئ!"}
-        if self.mined_supply >= self.total_supply:
+        mined = self.get_mined_supply()
+        if mined >= self.total_supply:
+            conn.close()
             return {"error": "تم تعدين كل العملات!"}
-        attempt = f"{self.last_block_hash}{nonce}"
+        last_hash = self.get_last_hash()
+        difficulty = self.get_difficulty()
+        attempt = f"{last_hash}{nonce}"
         result = hashlib.sha256(attempt.encode()).hexdigest()
-        target = "0" * self.difficulty
-        if not result.startswith(target):
-            return {"error": "الحل خاطئ! حاول مرة أخرى"}
-        halvings = int(self.mined_supply // self.halving_interval)
+        if not result.startswith("0" * difficulty):
+            conn.close()
+            return {"error": "الحل خاطئ!"}
+        halvings = int(mined // self.halving_interval)
         reward = self.block_reward / (2 ** halvings)
-        w.balance += reward
-        self.mined_supply += reward
-        self.last_block_hash = result[:16]
-        block = {
-            "index": len(self.blocks),
-            "miner": w.address,
-            "nonce": nonce,
-            "hash": result[:16],
-            "reward": reward,
-            "timestamp": time.time()
-        }
-        self.blocks.append(block)
-        if len(self.blocks) % 10 == 0:
-            self.difficulty += 1
+        new_balance = w['balance'] + reward
+        c.execute("UPDATE wallets SET balance=? WHERE private_key=?", (new_balance, private_key))
+        c.execute("INSERT INTO blocks (miner, reward, nonce, hash, timestamp) VALUES (?,?,?,?,?)",
+            (w['address'], reward, nonce, result[:16], time.time()))
+        block_count = self.get_block_count() + 1
+        if block_count % 100 == 0:
+            self._set_setting('difficulty', difficulty + 1)
+        self._set_setting('last_hash', result[:16])
+        conn.commit()
+        conn.close()
         return {
             "success": True,
             "message": f"🎉 عدنت {reward} IQSD!",
             "reward": reward,
-            "new_balance": w.balance,
-            "block": len(self.blocks)
+            "new_balance": new_balance
         }
 
     def stake(self, private_key, amount):
-        w = self.get_wallet_by_key(private_key)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM wallets WHERE private_key=?", (private_key,))
+        w = c.fetchone()
         if not w:
+            conn.close()
             return {"error": "🔐 مفتاح خاطئ!"}
-        if w.balance < amount:
+        if w['balance'] < amount:
+            conn.close()
             return {"error": "رصيد غير كافٍ"}
-        w.balance -= amount
-        w.staking += amount
-        w.staking_since = time.time()
+        c.execute("UPDATE wallets SET balance=?, staking=?, staking_since=? WHERE private_key=?",
+            (w['balance']-amount, w['staking']+amount, time.time(), private_key))
+        conn.commit()
+        conn.close()
         daily = round(amount * self.staking_rate / 365, 4)
         return {
             "success": True,
@@ -142,54 +200,80 @@ class IQSDCoin:
         }
 
     def claim_staking(self, private_key):
-        w = self.get_wallet_by_key(private_key)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM wallets WHERE private_key=?", (private_key,))
+        w = c.fetchone()
         if not w:
+            conn.close()
             return {"error": "🔐 مفتاح خاطئ!"}
-        if not w.staking or not w.staking_since:
+        if not w['staking'] or not w['staking_since']:
+            conn.close()
             return {"error": "لا يوجد ستيكينغ"}
-        days = (time.time() - w.staking_since) / 86400
-        reward = round(w.staking * self.staking_rate * days / 365, 4)
-        w.balance += reward
-        w.staking_since = time.time()
+        days = (time.time() - w['staking_since']) / 86400
+        reward = round(w['staking'] * self.staking_rate * days / 365, 4)
+        c.execute("UPDATE wallets SET balance=?, staking_since=? WHERE private_key=?",
+            (w['balance']+reward, time.time(), private_key))
+        conn.commit()
+        conn.close()
         return {
             "success": True,
             "reward_claimed": reward,
-            "new_balance": w.balance
+            "new_balance": w['balance']+reward
         }
 
     def transfer(self, private_key, to_address, amount):
-        sender = self.get_wallet_by_key(private_key)
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT * FROM wallets WHERE private_key=?", (private_key,))
+        sender = c.fetchone()
         if not sender:
+            conn.close()
             return {"error": "🔐 مفتاح خاطئ!"}
-        receiver = self.get_wallet_by_address(to_address)
+        c.execute("SELECT * FROM wallets WHERE address=?", (to_address,))
+        receiver = c.fetchone()
         if not receiver:
+            conn.close()
             return {"error": "عنوان المستلم غير موجود"}
-        if sender.address == to_address:
+        if sender['address'] == to_address:
+            conn.close()
             return {"error": "لا تقدر تحول لنفسك!"}
         fee = round(amount * 0.001, 4)
         total = amount + fee
-        if sender.balance < total:
+        if sender['balance'] < total:
+            conn.close()
             return {"error": "رصيد غير كافٍ"}
-        sender.balance -= total
-        receiver.balance += amount
-        if self.founder_address:
-            self.wallets[self.founder_address].balance += fee
+        c.execute("UPDATE wallets SET balance=? WHERE private_key=?",
+            (sender['balance']-total, private_key))
+        c.execute("UPDATE wallets SET balance=? WHERE address=?",
+            (receiver['balance']+amount, to_address))
+        c.execute("UPDATE wallets SET balance=balance+? WHERE address=?",
+            (fee, self.founder_address))
+        conn.commit()
+        conn.close()
         return {
             "success": True,
             "message": f"✅ تم تحويل {amount} IQSD",
             "to": to_address,
             "fee": fee,
-            "new_balance": sender.balance
+            "new_balance": sender['balance']-total
         }
 
     def get_stats(self):
+        mined = self.get_mined_supply()
+        blocks = self.get_block_count()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) as cnt FROM wallets")
+        wallets = c.fetchone()['cnt']
+        conn.close()
         return {
             "total_supply": self.total_supply,
-            "mined_supply": self.mined_supply,
-            "remaining": self.total_supply - self.mined_supply,
-            "total_wallets": len(self.wallets),
-            "total_blocks": len(self.blocks),
-            "difficulty": self.difficulty,
+            "mined_supply": round(mined),
+            "remaining": round(self.total_supply - mined),
+            "total_wallets": wallets,
+            "total_blocks": blocks,
+            "difficulty": self.get_difficulty(),
             "staking_rate": "5% سنوياً",
             "block_reward": self.block_reward
-        }
+    }
