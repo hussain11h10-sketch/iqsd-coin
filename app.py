@@ -3,7 +3,6 @@ from coin import IQSDCoin
 
 app = Flask(__name__)
 coin = IQSDCoin()
-coin.init_founder("hussain")
 
 @app.route('/')
 def home():
