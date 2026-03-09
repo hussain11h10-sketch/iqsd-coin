@@ -31,7 +31,7 @@ class IQSDCoin:
     def __init__(self):
         self.wallets = {}
         self.total_supply = 21000000
-        self.mined_supply = 1000000
+        self.mined_supply = 1000000000
         self.block_reward = 50
         self.halving_interval = 210000
         self.staking_rate = 0.05
