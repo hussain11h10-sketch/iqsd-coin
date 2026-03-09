@@ -1,4 +1,4 @@
-request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from coin import IQSDCoin
 
 app = Flask(__name__)
@@ -23,12 +23,16 @@ def login():
         return jsonify({"error": "أرسل المفتاح"})
     return jsonify(coin.login(data['private_key']))
 
-@app.route('/mine', methods=['POST'])
-def mine():
+@app.route('/mining/challenge')
+def mining_challenge():
+    return jsonify(coin.get_mining_challenge())
+
+@app.route('/mining/submit', methods=['POST'])
+def mining_submit():
     data = request.json
-    if not data or 'private_key' not in data:
-        return jsonify({"error": "أرسل المفتاح"})
-    return jsonify(coin.mine(data['private_key']))
+    if not data or 'private_key' not in data or 'nonce' not in data:
+        return jsonify({"error": "أرسل البيانات"})
+    return jsonify(coin.submit_mining(data['private_key'], data['nonce']))
 
 @app.route('/stake', methods=['POST'])
 def stake():
