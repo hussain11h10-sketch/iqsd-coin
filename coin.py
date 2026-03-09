@@ -1,6 +1,5 @@
 import hashlib
 import random
-import json
 import time
 
 class Wallet:
@@ -11,7 +10,6 @@ class Wallet:
         self.balance = 0
         self.staking = 0
         self.staking_since = None
-        self.transactions = []
 
     def generate_address(self):
         data = str(random.randint(100000, 999999)) + self.owner
@@ -36,37 +34,25 @@ class IQSDCoin:
         self.wallets = {}
         self.total_supply = 21000000
         self.mined_supply = 1000000
-        self.founder_wallet = None
+        self.founder_name = "hussain"
         self.block_reward = 50
         self.halving_interval = 210000
         self.staking_rate = 0.05
         self.blocks = []
 
-    def init_founder(self, name):
-        if self.founder_wallet:
-            return {"error": "المؤسس موجود"}
-        w = Wallet(name)
-        w.balance = 1000000
-        self.wallets[name] = w
-        self.founder_wallet = name
-        return {
-            "success": True,
-            "message": f"👑 محفظة المؤسس {name}",
-            "address": w.address,
-            "private_key": w.private_key,
-            "balance": 1000000
-        }
-
     def create_wallet(self, name):
         if name in self.wallets:
             return {"error": "المحفظة موجودة مسبقاً"}
         w = Wallet(name)
+        if name == self.founder_name:
+            w.balance = 1000000
         self.wallets[name] = w
         return {
             "success": True,
             "owner": name,
             "address": w.address,
             "private_key": w.private_key,
+            "balance": w.balance,
             "message": "⚠️ احتفظ بمفتاحك الخاص! لا تعطيه لأحد!"
         }
 
@@ -154,8 +140,8 @@ class IQSDCoin:
             return {"error": "رصيد غير كافٍ"}
         self.wallets[sender_name].balance -= total
         receiver.balance += amount
-        if self.founder_wallet:
-            self.wallets[self.founder_wallet].balance += fee
+        if self.founder_name in self.wallets:
+            self.wallets[self.founder_name].balance += fee
         return {
             "success": True,
             "message": f"✅ تم تحويل {amount} IQSD",
@@ -173,4 +159,4 @@ class IQSDCoin:
             "total_blocks": len(self.blocks),
             "staking_rate": "5% سنوياً",
             "block_reward": self.block_reward
-        }
+            }
