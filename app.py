@@ -1,26 +1,18 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from coin import IQSDCoin
+import os
 
 app = Flask(__name__)
 coin = IQSDCoin()
-
-# تهيئة محفظة المؤسس
 coin.init_founder("hussain")
 
 @app.route('/')
 def home():
-    return jsonify({
-        "name": "IQSD Coin",
-        "message": "عملة IQSD العربية تعمل!",
-        "version": "1.0",
-        "stats": coin.get_stats()
-    })
+    return send_from_directory('.', 'index.html')
 
-@app.route('/founder')
-def founder():
-    if coin.founder_wallet:
-        return jsonify(coin.wallets[coin.founder_wallet].get_info())
-    return jsonify({"error": "لا يوجد مؤسس"})
+@app.route('/stats')
+def stats():
+    return jsonify(coin.get_stats())
 
 @app.route('/wallet/create', methods=['POST'])
 def create_wallet():
@@ -62,10 +54,6 @@ def transfer():
     if not data:
         return jsonify({"error": "أرسل البيانات"})
     return jsonify(coin.transfer(data['from'], data['to'], data['amount']))
-
-@app.route('/stats')
-def stats():
-    return jsonify(coin.get_stats())
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
